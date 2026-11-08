@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PCF Test">
+<meta name="theme-color" content="#000000">
+<title>Players Coach Finder · Accuracy Test</title>
+<style>
+  :root { --accent:#22c55e; --warn:#f59e0b; --bad:#ef4444; --muted:#a3a3a3; --panel:rgba(0,0,0,.62); }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; height:100%; background:#000; color:#fff; overscroll-behavior:none;
+    font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; touch-action:manipulation; }
+  .hidden { display:none !important; }
+  .screen { position:fixed; inset:0; }
+  .muted { color:var(--muted); }
+  button { font-family:inherit; cursor:pointer; }
+
+  /* ---------- Start screen ---------- */
+  #start { overflow:auto; padding:calc(env(safe-area-inset-top) + 24px) 22px calc(env(safe-area-inset-bottom) + 24px); }
+  #start h1 { font-size:28px; margin:0 0 4px; }
+  #start h2 { font-size:17px; font-weight:600; color:var(--muted); margin:0 0 20px; }
+  #start ol { padding-left:22px; font-size:17px; line-height:1.45; }
+  #start li { margin-bottom:10px; }
+  .callout { background:#1c1c1e; border-radius:14px; padding:14px 16px; font-size:16px; line-height:1.4; margin:16px 0; }
+
+  /* ---------- Aim screen ---------- */
+  #cam { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; background:#111; }
+  #flash { position:absolute; inset:0; background:var(--accent); opacity:0; pointer-events:none; transition:opacity .45s ease-out; }
+  header { position:absolute; top:0; left:0; right:0; z-index:5;
+    padding:calc(env(safe-area-inset-top) + 8px) 10px 10px; display:flex; gap:8px; align-items:center; justify-content:space-between;
+    background:linear-gradient(rgba(0,0,0,.75), rgba(0,0,0,0)); }
+  .chip { background:var(--panel); border-radius:999px; padding:7px 11px; font-size:14px; font-weight:700; white-space:nowrap; border:0; color:#fff; }
+  .chip.good { color:#86efac; } .chip.ok { color:#fcd34d; } .chip.bad { color:#fca5a5; }
+  .holeSel { display:flex; align-items:center; gap:2px; background:var(--panel); border-radius:999px; padding:3px; }
+  .holeSel button { width:42px; height:42px; border-radius:999px; border:0; background:rgba(255,255,255,.16); color:#fff; font-size:24px; font-weight:800; }
+  .holeSel span { min-width:78px; text-align:center; font-weight:800; font-size:18px; }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+  #banner { position:absolute; left:10px; right:10px; top:calc(env(safe-area-inset-top) + 64px); z-index:6;
+    background:rgba(120,53,15,.92); color:#fff; border-radius:12px; padding:10px 12px; font-size:15px; line-height:1.35; }
+  #reticle { position:absolute; left:50%; top:40%; width:160px; height:160px; transform:translate(-50%,-50%); z-index:4; }
+  #reticle svg { width:100%; height:100%; filter:drop-shadow(0 0 2px rgba(0,0,0,.9)); }
+  #lockLabel { position:absolute; left:50%; top:calc(40% + 92px); transform:translateX(-50%); z-index:4;
+    background:var(--panel); border-radius:12px; padding:6px 14px; font-size:20px; font-weight:800; white-space:nowrap; }
+  #lockLabel:empty { display:none; }
+  #camRow { position:absolute; right:10px; top:calc(40% - 110px); z-index:5; display:flex; flex-direction:column; gap:6px; }
+  footer { position:absolute; left:0; right:0; bottom:0; z-index:5;
+    padding:40px 12px calc(env(safe-area-inset-bottom) + 12px); background:linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.85) 35%); }
+  .card { background:var(--panel); border-radius:18px; padding:12px 16px; margin-bottom:12px; }
+  .card.locked { outline:3px solid var(--accent); }
+  .yardRow { display:flex; align-items:baseline; gap:10px; }
+  .big { font-size:66px; font-weight:800; line-height:1; font-variant-numeric:tabular-nums; }
+  .unit { font-size:22px; font-weight:700; }
+  .what { font-size:18px; font-weight:800; letter-spacing:.04em; }
+  .sub { font-size:15px; color:#d4d4d4; margin-top:6px; line-height:1.35; }
+  .details { font-size:12.5px; color:var(--muted); margin-top:6px; line-height:1.35; font-variant-numeric:tabular-nums; }
+  .btnRow { display:flex; gap:12px; }
+  .btn { flex:1; min-height:62px; border-radius:16px; border:0; font-size:20px; font-weight:800; color:#000; background:#fff; padding:0 12px; }
+  .btn.primary { background:var(--accent); }
+  .btn.dark { background:#2c2c2e; color:#fff; }
+  .btn.danger { background:#7f1d1d; color:#fff; }
+  .btn:disabled { opacity:.4; }
+
+  /* ---------- Modal sheet ---------- */
+  .modal { position:fixed; inset:0; z-index:50; background:rgba(0,0,0,.55); display:flex; align-items:flex-end; justify-content:center; }
+  .sheet { background:#1c1c1e; width:100%; max-width:560px; border-radius:22px 22px 0 0; padding:18px 18px calc(env(safe-area-inset-bottom) + 18px); }
+  .sheet h2 { margin:0 0 6px; font-size:22px; }
+  .sheet p { margin:6px 0 12px; font-size:16px; line-height:1.4; color:#d4d4d4; }
+  .progress { height:12px; background:#3a3a3c; border-radius:7px; overflow:hidden; margin:8px 0 6px; }
+  .progress > div { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+  .status { font-size:15px; color:#d4d4d4; min-height:20px; }
+  .sheet label { display:block; font-size:15px; color:var(--muted); margin:12px 0 6px; }
+  .sheet input { width:100%; font-size:30px; padding:10px 14px; border-radius:12px; border:2px solid #48484a; background:#000; color:#fff; }
+  .sheet input.small { font-size:18px; }
+  .preview { font-size:20px; font-weight:800; margin:12px 0 4px; min-height:26px; }
+  .sheet .btnRow { margin-top:16px; }
+
+  /* ---------- Results screen ---------- */
+  #results { overflow:auto; padding:calc(env(safe-area-inset-top) + 12px) 14px calc(env(safe-area-inset-bottom) + 24px); background:#000; }
+  .resHead { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  .resHead h2 { margin:0; font-size:24px; }
+  .resHead button { background:#2c2c2e; color:#fff; border:0; border-radius:12px; padding:10px 14px; font-size:17px; font-weight:700; }
+  #verdict { font-size:19px; font-weight:800; line-height:1.3; }
+  #verdict.pass { background:#14532d; } #verdict.borderline { background:#78350f; } #verdict.fail { background:#7f1d1d; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
+  .stat { background:#1c1c1e; border-radius:14px; padding:10px 12px; }
+  .stat b { display:block; font-size:24px; font-variant-numeric:tabular-nums; }
+  .stat span { font-size:13px; color:var(--muted); }
+  #results h3 { margin:22px 0 8px; font-size:18px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; font-variant-numeric:tabular-nums; }
+  th, td { padding:7px 4px; border-bottom:1px solid #2c2c2e; text-align:right; }
+  th:first-child, td:first-child { text-align:left; }
+  td.good { color:#86efac; font-weight:700; } td.ok { color:#fcd34d; font-weight:700; } td.bad { color:#fca5a5; font-weight:700; }
+  .del { background:none; border:0; color:#fca5a5; font-size:18px; padding:2px 6px; }
+  .settings label { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:9px 0; border-bottom:1px solid #2c2c2e; font-size:16px; }
+  .settings input[type=number] { width:96px; font-size:17px; padding:6px 8px; border-radius:8px; border:1px solid #48484a; background:#000; color:#fff; text-align:right; }
+  .settings input[type=checkbox] { width:24px; height:24px; }
+  #toast { position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 170px); transform:translateX(-50%); z-index:60;
+    background:#fff; color:#000; font-weight:800; border-radius:999px; padding:10px 18px; font-size:16px; opacity:0; transition:opacity .25s; pointer-events:none; }
+  #toast.show { opacity:1; }
+</style>
+</head>
+<body>
+
+<!-- ===================== START ===================== -->
+<div id="start" class="screen">
+  <h1>Players Coach Finder</h1>
+  <h2>Accuracy Test · v<span id="verStart"></span> · Timber Creek</h2>
+  <div class="callout">
+    <b>One-time iPhone setting:</b> Settings → Privacy &amp; Security → Location Services → <b>Safari Websites</b> → "While Using the App" and <b>Precise Location ON</b>.
+  </div>
+  <ol>
+    <li>Tap <b>Start</b> and allow <b>Motion &amp; Orientation</b>, <b>Camera</b> and <b>Location</b>.</li>
+    <li>At your ball: laser the flag, then tap <b>Log laser</b> and type the laser number.</li>
+    <li>At the cup: tap <b>Mark pin</b> and stand still 15 seconds.</li>
+    <li>After the round: open <b>Results</b> → <b>Share CSV</b> and send it to Claude.</li>
+  </ol>
+  <div class="callout muted" id="storageNote">Your data is saved on this phone only. Export after every round.</div>
+  <button id="startBtn" class="btn primary" style="width:100%">Start</button>
+</div>
+
+<!-- ===================== AIM ===================== -->
+<div id="aim" class="screen hidden">
+  <video id="cam" playsinline muted autoplay></video>
+  <div id="flash"></div>
+  <header>
+    <div class="holeSel">
+      <button id="holePrev" aria-label="Previous hole">−</button>
+      <span id="holeLabel">Hole 1</span>
+      <button id="holeNext" aria-label="Next hole">+</button>
+    </div>
+    <div class="chips">
+      <span id="gpsChip" class="chip bad">GPS …</span>
+      <span id="compassChip" class="chip">— °</span>
+      <button id="resultsBtn" class="chip">Results</button>
+    </div>
+  </header>
+  <div id="banner" class="hidden"></div>
+  <div id="camRow">
+    <button id="lensBtn" class="chip hidden">Lens</button>
+    <button id="zoomBtn" class="chip hidden">1×</button>
+  </div>
+  <div id="reticle" role="button" aria-label="Tap to lock">
+    <svg viewBox="0 0 160 160">
+      <circle cx="80" cy="80" r="66" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="9"/>
+      <circle id="ring" cx="80" cy="80" r="66" fill="none" stroke="#22c55e" stroke-width="9" stroke-linecap="round"
+              transform="rotate(-90 80 80)" stroke-dasharray="414.69" stroke-dashoffset="414.69"/>
+      <circle cx="80" cy="80" r="30" fill="none" stroke="#fff" stroke-width="3"/>
+      <line x1="80" y1="22" x2="80" y2="58" stroke="#fff" stroke-width="2.5"/>
+      <line x1="80" y1="102" x2="80" y2="138" stroke="#fff" stroke-width="2.5"/>
+      <line x1="22" y1="80" x2="58" y2="80" stroke="#fff" stroke-width="2.5"/>
+      <line x1="102" y1="80" x2="138" y2="80" stroke="#fff" stroke-width="2.5"/>
+      <circle cx="80" cy="80" r="4.5" fill="#ef4444"/>
+    </svg>
+  </div>
+  <div id="lockLabel"></div>
+  <footer>
+    <div id="yardCard" class="card">
+      <div class="yardRow"><span id="yardWhat" class="what">PIN</span><span id="yardBig" class="big">—</span><span class="unit">yds</span></div>
+      <div id="yardSub" class="sub">Waiting for GPS…</div>
+      <div id="yardDetails" class="details"></div>
+    </div>
+    <div class="btnRow">
+      <button id="logBtn" class="btn">Log laser</button>
+      <button id="pinBtn" class="btn primary">Mark pin</button>
+    </div>
+  </footer>
+</div>
+
+<!-- ===================== RESULTS ===================== -->
+<div id="results" class="screen hidden">
+  <div class="resHead"><button id="backBtn">‹ Back</button><h2>Test results</h2></div>
+  <div id="verdict" class="card"></div>
+  <div class="grid" id="statsGrid"></div>
+  <div class="btnRow">
+    <button id="shareCsv" class="btn primary">Share CSV</button>
+    <button id="copyCsv" class="btn dark">Copy CSV</button>
+  </div>
+  <h3>Shots (newest first)</h3>
+  <table id="logTable"></table>
+  <h3>Pins</h3>
+  <table id="pinTable"></table>
+  <h3>Settings</h3>
+  <div class="settings" id="settingsForm"></div>
+  <h3>Data</h3>
+  <button id="clearAll" class="btn danger" style="width:100%">Clear all data</button>
+  <p class="muted" style="font-size:13px">Players Coach Finder accuracy test · version <span id="verRes"></span></p>
+</div>
+
+<div id="modal" class="modal hidden"><div class="sheet" id="sheet"></div></div>
+<div id="toast"></div>
+
+<script>
+(() => {
+'use strict';
+
+/* =====================================================================
+   Players Coach Finder — Accuracy Test (Option 1 "$0 Proof")
+   Compares GPS-based pin yardage with a laser rangefinder.
+   ===================================================================== */
+
+const APP_VERSION = '0.1.0';
+const STORE_KEY = 'pcf.v1';
+const YD = 0.9144;               // meters per yard
+const MAX_ACC = 30;              // m — fixes worse than this are ignored when averaging (if better ones exist)
+const DEFAULT_SETTINGS = {
+  hole: 1, holeCount: 27,
+  holdSeconds: 1.0,              // how long the phone must be steady before it locks
+  steadyThreshold: 3,            // deg/s — rotation below this counts as "steady"
+  logSeconds: 5,                 // GPS averaging when logging a laser reading
+  pinSeconds: 15,                // GPS averaging when marking the pin
+  sound: true, showDetails: true
+};
+const $ = id => document.getElementById(id);
+
+/* ---------------- Geodesy: WGS84 local tangent plane ----------------
+   For points a few hundred meters apart this matches a full ellipsoidal
+   geodesic to well under a centimeter. */
+const WGS84_A = 6378137.0, WGS84_E2 = 6.69437999014e-3, RAD = Math.PI / 180;
+function localDelta(lat1, lon1, lat2, lon2) {
+  const phi = ((lat1 + lat2) / 2) * RAD;
+  const s = Math.sin(phi);
+  const w = Math.sqrt(1 - WGS84_E2 * s * s);
+  const M = WGS84_A * (1 - WGS84_E2) / (w * w * w);   // meridional radius of curvature
+  const N = WGS84_A / w;                               // prime-vertical radius of curvature
+  return { dN: (lat2 - lat1) * RAD * M, dE: (lon2 - lon1) * RAD * N * Math.cos(phi) };
+}
+function distanceM(p, q) { const d = localDelta(p.lat, p.lon, q.lat, q.lon); return Math.hypot(d.dN, d.dE); }
+function bearingDeg(p, q) { const d = localDelta(p.lat, p.lon, q.lat, q.lon); return (Math.atan2(d.dE, d.dN) / RAD + 360) % 360; }
+const toYd = m => m / YD;
+
+/* ---------------- Small helpers ---------------- */
+const pad2 = n => String(n).padStart(2, '0');
+function dayKey(ts) { const d = new Date(ts); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
+function fmtTime(ts) { return new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
+function fmtDiff(d) { return (d > 0 ? '+' : '') + d; }
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function median(a) { if (!a.length) return null; const s = [...a].sort((x, y) => x - y), n = s.length; return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2; }
+function angleDiff(a, b) { return ((a - b + 540) % 360) - 180; }   // signed, -180..180
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+/* Weighted average of GPS fixes (weight = 1/accuracy²). */
+function averageFixes(fixes) {
+  if (!fixes || !fixes.length) return null;
+  const good = fixes.filter(f => f.acc != null && f.acc <= MAX_ACC);
+  const use = good.length ? good : fixes;
+  let sw = 0, slat = 0, slon = 0, salt = 0, swa = 0;
+  for (const f of use) {
+    const a = Math.max(f.acc || 50, 1), w = 1 / (a * a);
+    sw += w; slat += w * f.lat; slon += w * f.lon;
+    if (f.alt != null && Number.isFinite(f.alt)) { salt += w * f.alt; swa += w; }
+  }
+  const lat = slat / sw, lon = slon / sw;
+  const spread = Math.sqrt(use.reduce((s, f) => s + distanceM({ lat, lon }, f) ** 2, 0) / use.length);
+  return { lat, lon, acc: median(use.map(f => f.acc)), spread, n: use.length, weak: !good.length, alt: swa ? salt / swa : null };
+}
+
+/* ---------------- Storage ---------------- */
+let data = { pins: [], logs: [], settings: { ...DEFAULT_SETTINGS } };
+let storageOK = true;
+function load() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) {
+      const d = JSON.parse(raw);
+      data.pins = Array.isArray(d.pins) ? d.pins : [];
+      data.logs = Array.isArray(d.logs) ? d.logs : [];
+      data.settings = { ...DEFAULT_SETTINGS, ...(d.settings || {}) };
+    }
+  } catch (e) { storageOK = false; }
+}
+function save() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); storageOK = true; }
+  catch (e) { storageOK = false; showBanner('Could not save on this phone (storage blocked). Export your results now.'); }
+}
+const S = () => data.settings;
+
+/* ---------------- Pins & logs ---------------- */
+function currentPin(hole, now = Date.now()) {
+  const k = dayKey(now); let best = null;
+  for (const p of data.pins) if (p.hole === hole && dayKey(p.t) === k && (!best || p.t > best.t)) best = p;
+  return best;
+}
+/* Adds a pin and fills in today's shots on that hole:
+   - shots with no pin yet, and
+   - shots made after the previous pin for this hole was marked (a re-mark replaces it). */
+function addPin(pin) {
+  const prev = currentPin(pin.hole, pin.t);
+  data.pins.push(pin);
+  const k = dayKey(pin.t); let count = 0;
+  for (const l of data.logs) {
+    if (l.hole !== pin.hole || dayKey(l.t) !== k || l.t > pin.t) continue;
+    if (l.pinId == null || (prev && l.pinId === prev.id && l.t > prev.t)) { l.pinId = pin.id; count++; }
+  }
+  save();
+  return count;
+}
+function comparisons() {
+  const byId = new Map(data.pins.map(p => [p.id, p]));
+  return data.logs
+    .filter(l => l.pinId && byId.has(l.pinId) && Number.isFinite(l.laser))
+    .map(l => {
+      const p = byId.get(l.pinId), exact = toYd(distanceM(l, p)), app = Math.round(exact);
+      return { log: l, pin: p, exact, app, diff: app - l.laser };
+    });
+}
+function computeStats(rows) {
+  const n = rows.length;
+  if (!n) return { n: 0, verdict: 'collecting' };
+  const abs = rows.map(r => Math.abs(r.diff));
+  const within = abs.filter(a => a <= 3).length;
+  const meanAbs = abs.reduce((a, b) => a + b, 0) / n;
+  const bias = rows.reduce((a, r) => a + r.diff, 0) / n;
+  const pct = 100 * within / n;
+  let verdict = 'collecting';
+  if (n >= 50) verdict = (pct >= 90 && meanAbs <= 2) ? 'pass' : (pct >= 75 ? 'borderline' : 'fail');
+  return { n, within, pct, meanAbs, bias, maxAbs: Math.max(...abs), verdict };
+}
+
+/* ---------------- GPS ---------------- */
+const gps = { latest: null, recent: [], listeners: new Set(), watchId: null, seen: new Set(), error: null, coarseSince: null };
+function onPos(pos) {
+  const c = pos.coords;
+  const key = pos.timestamp + ':' + c.latitude.toFixed(7) + ':' + c.longitude.toFixed(7);
+  if (gps.seen.has(key)) return;
+  gps.seen.add(key);
+  if (gps.seen.size > 400) gps.seen = new Set([...gps.seen].slice(-100));
+  const f = { lat: c.latitude, lon: c.longitude, acc: c.accuracy, alt: c.altitude, altAcc: c.altitudeAccuracy, t: Date.now() };
+  gps.latest = f; gps.error = null;
+  gps.recent.push(f);
+  const cutoff = Date.now() - 30000;
+  while (gps.recent.length && gps.recent[0].t < cutoff) gps.recent.shift();
+  if (f.acc > 100) { gps.coarseSince = gps.coarseSince || Date.now(); } else gps.coarseSince = null;
+  for (const fn of gps.listeners) fn(f);
+}
+function onPosErr(err) {
+  gps.error = err;
+  if (err.code === 1) showBanner('Location is blocked. Allow it: Settings → Privacy &amp; Security → Location Services → Safari Websites → While Using + Precise Location ON. Then reload this page.');
+}
+const GEO_OPTS = { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 };
+function startGPS() {
+  if (!('geolocation' in navigator)) { showBanner('This browser has no GPS access.'); return; }
+  if (gps.watchId != null) navigator.geolocation.clearWatch(gps.watchId);
+  gps.watchId = navigator.geolocation.watchPosition(onPos, onPosErr, GEO_OPTS);
+}
+/* Collect fresh fixes for `seconds`, also polling once a second. */
+function collectFixes(seconds, onProgress) {
+  return new Promise(resolve => {
+    const fixes = [], t0 = performance.now();
+    const listener = f => fixes.push(f);
+    gps.listeners.add(listener);
+    const poll = setInterval(() => { try { navigator.geolocation.getCurrentPosition(onPos, () => {}, GEO_OPTS); } catch (e) {} }, 1000);
+    const timer = setInterval(() => {
+      const el = (performance.now() - t0) / 1000;
+      if (onProgress) onProgress(Math.min(el / seconds, 1), fixes.length, el);
+      if (el >= seconds) {
+        clearInterval(timer); clearInterval(poll); gps.listeners.delete(listener);
+        if (!fixes.length && gps.latest && Date.now() - gps.latest.t < 15000) fixes.push(gps.latest);
+        resolve(fixes);
+      }
+    }, 100);
+  });
+}
+function recentPosition() {
+  const now = Date.now();
+  const r = gps.recent.filter(f => now - f.t < 3000);
+  if (r.length) return averageFixes(r);
+  if (gps.latest && now - gps.latest.t < 10000) return averageFixes([gps.latest]);
+  return null;
+}
+
+/* ---------------- Motion & compass ---------------- */
+const sensors = { rot: null, motionT: 0, heading: null, headingAcc: null, headingT: 0, tilt: null };
+function onMotion(e) {
+  const r = e.rotationRate;
+  if (!r || (r.alpha == null && r.beta == null && r.gamma == null)) return;
+  const mag = Math.hypot(r.alpha || 0, r.beta || 0, r.gamma || 0);   // deg/s
+  sensors.rot = sensors.rot == null ? mag : sensors.rot * 0.75 + mag * 0.25;
+  sensors.motionT = performance.now();
+}
+function onOrient(e) {
+  let h = null, acc = null;
+  if (typeof e.webkitCompassHeading === 'number' && !isNaN(e.webkitCompassHeading)) { h = e.webkitCompassHeading; acc = e.webkitCompassAccuracy; }
+  else if (e.absolute && e.alpha != null) { h = (360 - e.alpha) % 360; }
+  if (h != null) { sensors.heading = h; sensors.headingAcc = (acc != null && acc >= 0) ? acc : null; sensors.headingT = Date.now(); }
+  if (e.beta != null) sensors.tilt = e.beta;
+}
+
+/* ---------------- Camera ---------------- */
+const cam = { stream: null, devices: [], index: -1, zoomCaps: null, zoomLevels: [], zoomIdx: 0 };
+async function startCamera(deviceId) {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('No camera API');
+  if (cam.stream) cam.stream.getTracks().forEach(t => t.stop());
+  const video = deviceId
+    ? { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+    : { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } };
+  cam.stream = await navigator.mediaDevices.getUserMedia({ video, audio: false });
+  const el = $('cam'); el.srcObject = cam.stream; el.play().catch(() => {});
+  try {
+    const all = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+    const back = all.filter(d => /back|rear|environment|tele|wide/i.test(d.label) && !/front/i.test(d.label));
+    cam.devices = back.length ? back : all;
+    const curId = cam.stream.getVideoTracks()[0].getSettings().deviceId;
+    cam.index = Math.max(0, cam.devices.findIndex(d => d.deviceId === curId));
+    $('lensBtn').classList.toggle('hidden', cam.devices.length < 2);
+    $('lensBtn').textContent = shortLens(cam.devices[cam.index]);
+  } catch (e) {}
+  try {
+    const track = cam.stream.getVideoTracks()[0];
+    const caps = track.getCapabilities ? track.getCapabilities() : {};
+    if (caps.zoom && caps.zoom.max > caps.zoom.min) {
+      cam.zoomCaps = caps.zoom;
+      cam.zoomLevels = [1, 2, 4, 8].filter(z => z >= caps.zoom.min && z <= caps.zoom.max);
+      if (!cam.zoomLevels.length) cam.zoomLevels = [caps.zoom.min];
+      cam.zoomIdx = 0;
+      $('zoomBtn').classList.remove('hidden'); $('zoomBtn').textContent = cam.zoomLevels[0] + '×';
+    } else { cam.zoomCaps = null; $('zoomBtn').classList.add('hidden'); }
+  } catch (e) {}
+}
+function shortLens(d) {
+  if (!d || !d.label) return 'Lens';
+  const l = d.label.toLowerCase();
+  if (l.includes('tele')) return 'Tele';
+  if (l.includes('ultra')) return 'Ultra';
+  if (l.includes('triple') || l.includes('dual')) return 'Auto';
+  return 'Main';
+}
+
+/* ---------------- Feedback: ding, flash, toast ---------------- */
+let audioCtx = null;
+function initAudio() {
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+  try { const AC = window.AudioContext || window.webkitAudioContext; if (AC) { audioCtx = new AC(); audioCtx.resume && audioCtx.resume(); } } catch (e) {}
+}
+function ding(twoTone) {
+  if (navigator.vibrate) { try { navigator.vibrate(twoTone ? [40, 60, 40] : 40); } catch (e) {} }
+  if (!S().sound || !audioCtx) return;
+  try {
+    const t = audioCtx.currentTime;
+    const notes = twoTone ? [[1046.5, 0], [1568, 0.12]] : [[1318.5, 0]];
+    for (const [freq, at] of notes) {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = 'sine'; o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, t + at);
+      g.gain.exponentialRampToValueAtTime(0.5, t + at + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + at + 0.4);
+      o.connect(g); g.connect(audioCtx.destination); o.start(t + at); o.stop(t + at + 0.42);
+    }
+  } catch (e) {}
+}
+function flash() { const f = $('flash'); f.style.transition = 'none'; f.style.opacity = '0.45'; requestAnimationFrame(() => { f.style.transition = 'opacity .45s ease-out'; f.style.opacity = '0'; }); }
+let toastTimer = null;
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200); }
+function showBanner(html) { const b = $('banner'); b.innerHTML = html; b.classList.remove('hidden'); }
+function hideBanner() { $('banner').classList.add('hidden'); }
+
+/* ---------------- Wake lock ---------------- */
+let wakeLock = null, started = false;
+async function requestWakeLock() { try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {} }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && started) { requestWakeLock(); startGPS(); } });
+
+/* ---------------- Lock logic ---------------- */
+const RING_LEN = 414.69;   // 2πr for r = 66
+let lockState = 'search', steadyProg = 0, moveTime = 0, lastFrame = 0, lastLock = null;
+function currentReading() {
+  const pos = recentPosition(), pin = currentPin(S().hole);
+  if (!pos || !pin) return { pos, pin, yd: null };
+  return { pos, pin, yd: toYd(distanceM(pos, pin)), bearing: bearingDeg(pos, pin) };
+}
+function doLock() {
+  lockState = 'locked'; steadyProg = 1; moveTime = 0;
+  const r = currentReading();
+  lastLock = r;
+  if (r.yd != null) { $('lockLabel').textContent = 'PIN ' + Math.round(r.yd); ding(true); flash(); $('yardCard').classList.add('locked'); }
+  else if (!r.pos) { $('lockLabel').textContent = 'Steady ✓ · waiting for GPS'; }
+  else { $('lockLabel').textContent = 'Steady ✓ · no pin yet for Hole ' + S().hole; ding(false); }
+}
+function unlock() { lockState = 'search'; steadyProg = 0; moveTime = 0; $('lockLabel').textContent = ''; $('yardCard').classList.remove('locked'); }
+function tick(now) {
+  const dt = lastFrame ? Math.min((now - lastFrame) / 1000, 0.1) : 0; lastFrame = now;
+  const haveMotion = sensors.motionT && (now - sensors.motionT) < 1000;
+  const rot = haveMotion ? sensors.rot : null, th = S().steadyThreshold;
+  const modalOpen = !$('modal').classList.contains('hidden');
+  if (!modalOpen && !$('aim').classList.contains('hidden')) {
+    if (lockState === 'search') {
+      if (rot != null && rot < th) steadyProg += dt / Math.max(S().holdSeconds, 0.2); else steadyProg = 0;
+      if (steadyProg > 0 && steadyProg < 1 && !$('lockLabel').textContent) $('lockLabel').textContent = 'Hold steady…';
+      if (steadyProg === 0 && $('lockLabel').textContent === 'Hold steady…') $('lockLabel').textContent = '';
+      if (steadyProg >= 1) doLock();
+    } else if (lockState === 'locked' && rot != null) {
+      if (rot > th * 2) { moveTime += dt; if (moveTime > 0.25) unlock(); } else moveTime = 0;
+    }
+  }
+  $('ring').setAttribute('stroke-dashoffset', String(RING_LEN * (1 - Math.min(steadyProg, 1))));
+  requestAnimationFrame(tick);
+}
+
+/* ---------------- Live UI refresh ---------------- */
+function refreshUI() {
+  const s = S();
+  $('holeLabel').textContent = 'Hole ' + s.hole;
+  // GPS chip
+  const g = gps.latest, chip = $('gpsChip');
+  if (!g) { chip.textContent = gps.error ? 'GPS off' : 'GPS …'; chip.className = 'chip bad'; }
+  else if (Date.now() - g.t > 10000) { chip.textContent = 'GPS stale'; chip.className = 'chip bad'; }
+  else { chip.textContent = 'GPS ±' + Math.round(g.acc) + ' m'; chip.className = 'chip ' + (g.acc <= 5 ? 'good' : g.acc <= 10 ? 'ok' : 'bad'); }
+  if (gps.coarseSince && Date.now() - gps.coarseSince > 20000) showBanner('Location looks approximate. Turn on <b>Precise Location</b>: Settings → Privacy &amp; Security → Location Services → Safari Websites.');
+  // Compass chip
+  const hc = $('compassChip');
+  if (sensors.heading != null && Date.now() - sensors.headingT < 3000) hc.textContent = Math.round(sensors.heading) + '°' + (s.showDetails && sensors.headingAcc != null ? ' ±' + Math.round(sensors.headingAcc) : '');
+  else hc.textContent = '— °';
+  // Yardage card
+  const r = currentReading();
+  const big = $('yardBig'), sub = $('yardSub'), det = $('yardDetails');
+  if (!r.pin) {
+    big.textContent = '—';
+    sub.innerHTML = 'No pin yet for Hole ' + s.hole + '. You can still <b>Log laser</b>; it fills in when you mark the pin.';
+  } else if (!r.pos) {
+    big.textContent = '—'; sub.textContent = 'Waiting for GPS…';
+  } else {
+    big.textContent = Math.round(r.yd);
+    sub.textContent = 'to pin · Hole ' + s.hole + ' · pin marked ' + fmtTime(r.pin.t);
+  }
+  if (s.showDetails) {
+    const parts = [];
+    if (r.pos) parts.push('You ±' + Math.round(r.pos.acc) + ' m');
+    if (r.pin) parts.push('Pin ±' + r.pin.acc.toFixed(1) + ' m (' + r.pin.n + (r.pin.n === 1 ? ' fix' : ' fixes') + ')');
+    if (r.bearing != null) parts.push('Pin bearing ' + Math.round(r.bearing) + '°');
+    if (r.bearing != null && sensors.heading != null) parts.push('Aim check ' + fmtDiff(Math.round(angleDiff(sensors.heading, r.bearing))) + '°');
+    if (sensors.rot != null) parts.push('Motion ' + sensors.rot.toFixed(1) + '°/s');
+    const todays = data.logs.filter(l => l.hole === s.hole && dayKey(l.t) === dayKey(Date.now())).length;
+    parts.push(todays + ' shot' + (todays === 1 ? '' : 's') + ' logged on this hole today');
+    det.textContent = parts.join(' · ');
+  } else det.textContent = '';
+}
+
+/* ---------------- Modal sheets ---------------- */
+let modalToken = null;
+function openModal(html) { $('sheet').innerHTML = html; $('modal').classList.remove('hidden'); unlock(); }
+function closeModal() { if (modalToken) modalToken.cancelled = true; modalToken = null; $('modal').classList.add('hidden'); }
+
+function openLogModal() {
+  const hole = S().hole;
+  openModal(`
+    <h2>Log laser · Hole ${hole}</h2>
+    <p>Stand at your ball. Type the yardage your laser showed for the flag.</p>
+    <div class="progress"><div id="mProg"></div></div>
+    <div class="status" id="mStatus">Averaging GPS…</div>
+    <label for="laserIn">Laser yards</label>
+    <input id="laserIn" type="number" inputmode="numeric" pattern="[0-9]*" min="1" max="800" placeholder="e.g. 152" autocomplete="off">
+    <label for="noteIn">Note (optional)</label>
+    <input id="noteIn" class="small" type="text" placeholder="e.g. laser may have hit trees" autocomplete="off">
+    <div class="preview" id="mPreview"></div>
+    <div class="btnRow"><button class="btn dark" id="mCancel">Cancel</button><button class="btn primary" id="mSave" disabled>Save</button></div>`);
+  const input = $('laserIn'); input.focus();          // keyboard opens right away (same tap)
+  const token = { cancelled: false }; modalToken = token;
+  let avg = null;
+  const laserVal = () => { const v = parseInt(input.value, 10); return (Number.isFinite(v) && v >= 1 && v <= 800) ? v : null; };
+  const update = () => {
+    const pin = currentPin(hole), laser = laserVal(), pv = $('mPreview');
+    if (avg && pin) {
+      const app = Math.round(toYd(distanceM(avg, pin)));
+      pv.textContent = 'App: ' + app + (laser != null ? ' · Laser: ' + laser + ' · Diff: ' + fmtDiff(app - laser) : '');
+    } else if (avg) pv.textContent = 'No pin yet: this shot fills in when you mark the pin.';
+    $('mSave').disabled = !(avg && laser != null);
+  };
+  input.addEventListener('input', update);
+  $('mCancel').onclick = closeModal;
+  $('mSave').onclick = () => {
+    const laser = laserVal(); if (!avg || laser == null) return;
+    const pin = currentPin(hole);
+    data.logs.push({
+      id: uid(), t: Date.now(), hole, lat: avg.lat, lon: avg.lon, acc: avg.acc, spread: avg.spread, n: avg.n, alt: avg.alt,
+      laser, pinId: pin ? pin.id : null,
+      heading: sensors.heading != null && Date.now() - sensors.headingT < 3000 ? sensors.heading : null,
+      headingAcc: sensors.headingAcc, note: $('noteIn').value.trim()
+    });
+    save(); closeModal(); toast(pin ? 'Saved' : 'Saved · mark the pin after you hole out');
+  };
+  collectFixes(S().logSeconds, (p, n) => {
+    if (token.cancelled) return;
+    $('mProg').style.width = (p * 100) + '%';
+    $('mStatus').textContent = 'Averaging GPS… ' + n + ' fix' + (n === 1 ? '' : 'es');
+  }).then(fixes => {
+    if (token.cancelled) return;
+    avg = averageFixes(fixes);
+    if (!avg) { $('mStatus').textContent = 'No GPS fix. Move into the open and try again.'; return; }
+    $('mStatus').textContent = '✓ GPS ±' + avg.acc.toFixed(1) + ' m (' + avg.n + (avg.n === 1 ? ' fix)' : ' fixes)') + (avg.weak ? ' · weak signal' : '');
+    update();
+  });
+}
+
+function openPinModal() {
+  const hole = S().hole, prev = currentPin(hole);
+  openModal(`
+    <h2>Mark pin · Hole ${hole}</h2>
+    <p>Stand right next to the cup and hold still until the bar fills.${prev ? '<br><b>Replaces</b> today\'s pin marked at ' + fmtTime(prev.t) + '.' : ''}</p>
+    <div class="progress"><div id="mProg"></div></div>
+    <div class="status" id="mStatus">Averaging GPS…</div>
+    <div class="btnRow" id="mButtons"><button class="btn dark" id="mCancel">Cancel</button></div>`);
+  const token = { cancelled: false }; modalToken = token;
+  $('mCancel').onclick = closeModal;
+  collectFixes(S().pinSeconds, (p, n, el) => {
+    if (token.cancelled) return;
+    $('mProg').style.width = (p * 100) + '%';
+    $('mStatus').textContent = 'Averaging GPS… ' + Math.max(0, Math.ceil(S().pinSeconds - el)) + ' s left · ' + n + ' fix' + (n === 1 ? '' : 'es');
+  }).then(fixes => {
+    if (token.cancelled) return;
+    const avg = averageFixes(fixes);
+    if (!avg) { $('mStatus').textContent = 'No GPS fix. Wait for the GPS chip to turn green and try again.'; return; }
+    const pin = { id: uid(), t: Date.now(), hole, lat: avg.lat, lon: avg.lon, acc: avg.acc, spread: avg.spread, n: avg.n, alt: avg.alt };
+    const count = addPin(pin);
+    ding(true);
+    $('mStatus').innerHTML = '<b>✓ Pin saved</b> (±' + avg.acc.toFixed(1) + ' m, ' + avg.n + (avg.n === 1 ? ' fix' : ' fixes') + (avg.weak ? ', weak signal' : '') + ').<br>' +
+      (count ? count + (count === 1 ? ' shot' : ' shots') + ' on Hole ' + hole + (count === 1 ? ' now uses' : ' now use') + ' this pin.' : 'Shots you log on Hole ' + hole + ' today will use this pin.');
+    $('mButtons').innerHTML = '<button class="btn dark" id="mDone">Done</button><button class="btn primary" id="mNext">Next hole →</button>';
+    $('mDone').onclick = closeModal;
+    $('mNext').onclick = () => { setHole(hole + 1); closeModal(); };
+  });
+}
+
+/* ---------------- Results screen ---------------- */
+function renderResults() {
+  const rows = comparisons(), st = computeStats(rows);
+  const v = $('verdict');
+  v.className = 'card ' + (st.verdict === 'collecting' ? '' : st.verdict);
+  if (st.verdict === 'collecting') {
+    v.innerHTML = 'Keep going: <b>' + st.n + '</b> of 50 comparisons' +
+      (st.n ? '<div class="sub">So far ' + st.pct.toFixed(0) + '% within ±3 yards. Goal: 90%+.</div>' : '<div class="sub">Log laser readings and mark pins to start.</div>');
+  } else if (st.verdict === 'pass') v.innerHTML = 'PASS: accurate enough to move to Option 2.<div class="sub">' + st.pct.toFixed(0) + '% within ±3 yards, average error ' + st.meanAbs.toFixed(1) + ' yards.</div>';
+  else if (st.verdict === 'borderline') v.innerHTML = 'BORDERLINE: let\'s find the cause and retest.<div class="sub">' + st.pct.toFixed(0) + '% within ±3 yards (goal 90%+).</div>';
+  else v.innerHTML = 'NOT YET: stop and rethink before spending money.<div class="sub">' + st.pct.toFixed(0) + '% within ±3 yards (goal 90%+).</div>';
+
+  const stat = (val, label) => '<div class="stat"><b>' + val + '</b><span>' + label + '</span></div>';
+  $('statsGrid').innerHTML = st.n ? [
+    stat(st.n, 'comparisons'),
+    stat(st.within + ' (' + st.pct.toFixed(0) + '%)', 'within ±3 yards'),
+    stat(st.meanAbs.toFixed(1) + ' yd', 'average error'),
+    stat(fmtDiff(+st.bias.toFixed(1)) + ' yd', 'bias (+ = app reads long)'),
+    stat(st.maxAbs + ' yd', 'largest miss'),
+    stat(data.logs.length - st.n, 'shots waiting for a pin')
+  ].join('') : '';
+
+  const byId = new Map(rows.map(r => [r.log.id, r]));
+  const logs = [...data.logs].sort((a, b) => b.t - a.t);
+  $('logTable').innerHTML = '<tr><th>Time</th><th>Hole</th><th>Laser</th><th>App</th><th>Diff</th><th>GPS</th><th></th></tr>' +
+    (logs.length ? logs.map(l => {
+      const r = byId.get(l.id), cls = r ? (Math.abs(r.diff) <= 3 ? 'good' : Math.abs(r.diff) <= 5 ? 'ok' : 'bad') : '';
+      return '<tr><td>' + esc(fmtTime(l.t)) + (l.note ? '<div class="muted" style="font-size:12px">' + esc(l.note) + '</div>' : '') + '</td><td>' + l.hole + '</td><td>' + l.laser + '</td><td>' +
+        (r ? r.app : '<span class="muted">no pin</span>') + '</td><td class="' + cls + '">' + (r ? fmtDiff(r.diff) : '') + '</td><td>±' + Math.round(l.acc) + 'm</td>' +
+        '<td><button class="del" data-log="' + l.id + '" aria-label="Delete">✕</button></td></tr>';
+    }).join('') : '<tr><td colspan="7" class="muted">No shots logged yet.</td></tr>');
+
+  const pins = [...data.pins].sort((a, b) => b.t - a.t);
+  $('pinTable').innerHTML = '<tr><th>Time</th><th>Hole</th><th>GPS</th><th>Fixes</th><th></th></tr>' +
+    (pins.length ? pins.map(p => '<tr><td>' + esc(dayKey(p.t) + ' ' + fmtTime(p.t)) + '</td><td>' + p.hole + '</td><td>±' + p.acc.toFixed(1) + 'm</td><td>' + p.n + '</td>' +
+      '<td><button class="del" data-pin="' + p.id + '" aria-label="Delete">✕</button></td></tr>').join('') : '<tr><td colspan="5" class="muted">No pins marked yet.</td></tr>');
+}
+function renderSettings() {
+  const s = S();
+  const num = (key, label, step, min, max) => '<label>' + label + '<input type="number" data-key="' + key + '" step="' + step + '" min="' + min + '" max="' + max + '" value="' + s[key] + '"></label>';
+  const chk = (key, label) => '<label>' + label + '<input type="checkbox" data-key="' + key + '"' + (s[key] ? ' checked' : '') + '></label>';
+  $('settingsForm').innerHTML =
+    num('holeCount', 'Number of holes', 1, 1, 54) +
+    num('holdSeconds', 'Hold steady before lock (seconds)', 0.1, 0.3, 3) +
+    num('steadyThreshold', 'Steady if turning less than (°/s)', 0.5, 0.5, 20) +
+    num('logSeconds', 'GPS averaging per shot (seconds)', 1, 1, 30) +
+    num('pinSeconds', 'GPS averaging at the pin (seconds)', 1, 3, 60) +
+    chk('sound', 'Ding sound') + chk('showDetails', 'Show sensor details');
+}
+function buildCSV() {
+  const byId = new Map(data.pins.map(p => [p.id, p]));
+  const cols = ['type', 'id', 'date', 'time', 'hole', 'lat', 'lon', 'gps_acc_m', 'gps_spread_m', 'fixes', 'altitude_m',
+    'laser_yds', 'app_yds', 'app_yds_exact', 'diff_yds', 'pin_id', 'pin_time', 'pin_acc_m', 'heading_deg', 'heading_acc_deg', 'bearing_to_pin_deg', 'note'];
+  const q = v => { if (v == null) return ''; const s = String(v); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const f = (v, d) => v == null || !Number.isFinite(v) ? '' : v.toFixed(d);
+  const lines = [cols.join(',')];
+  for (const l of [...data.logs].sort((a, b) => a.t - b.t)) {
+    const p = l.pinId ? byId.get(l.pinId) : null;
+    const exact = p ? toYd(distanceM(l, p)) : null;
+    lines.push([ 'shot', l.id, dayKey(l.t), new Date(l.t).toTimeString().slice(0, 8), l.hole, f(l.lat, 7), f(l.lon, 7), f(l.acc, 1), f(l.spread, 1), l.n, f(l.alt, 1),
+      l.laser, p ? Math.round(exact) : '', f(exact, 2), p ? Math.round(exact) - l.laser : '', p ? p.id : '', p ? new Date(p.t).toTimeString().slice(0, 8) : '', p ? f(p.acc, 1) : '',
+      f(l.heading, 1), f(l.headingAcc, 1), p ? f(bearingDeg(l, p), 1) : '', l.note || '' ].map(q).join(','));
+  }
+  for (const p of [...data.pins].sort((a, b) => a.t - b.t)) {
+    lines.push([ 'pin', p.id, dayKey(p.t), new Date(p.t).toTimeString().slice(0, 8), p.hole, f(p.lat, 7), f(p.lon, 7), f(p.acc, 1), f(p.spread, 1), p.n, f(p.alt, 1),
+      '', '', '', '', '', '', '', '', '', '', '' ].map(q).join(','));
+  }
+  return lines.join('\n') + '\n';
+}
+async function shareCSV() {
+  const csv = buildCSV(), d = new Date();
+  const name = 'pcf-test-' + dayKey(d) + '-' + pad2(d.getHours()) + pad2(d.getMinutes()) + '.csv';
+  let file = null;
+  try { file = new File([csv], name, { type: 'text/csv' }); } catch (e) {}
+  if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: 'Players Coach Finder test results' }); return; }
+    catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  const url = URL.createObjectURL(file || new Blob([csv], { type: 'text/csv' }));
+  const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+/* ---------------- Screens & events ---------------- */
+function show(id) { for (const s of ['start', 'aim', 'results']) $(s).classList.toggle('hidden', s !== id); }
+function setHole(h) { const n = S().holeCount; S().hole = ((h - 1 + n) % n) + 1; save(); unlock(); refreshUI(); }
+
+$('startBtn').addEventListener('click', async () => {
+  // Permission requests must start synchronously inside the tap (iOS rule).
+  initAudio();
+  const asks = [];
+  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') asks.push(DeviceMotionEvent.requestPermission().catch(() => 'denied'));
+  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') asks.push(DeviceOrientationEvent.requestPermission().catch(() => 'denied'));
+  startGPS();
+  const answers = await Promise.all(asks);
+  window.addEventListener('devicemotion', onMotion);
+  window.addEventListener('deviceorientation', onOrient);
+  window.addEventListener('deviceorientationabsolute', onOrient);
+  started = true;
+  show('aim'); refreshUI();
+  // Warn only if no motion data actually arrives (avoids false alarms).
+  setTimeout(() => {
+    if (!sensors.motionT) showBanner(answers.some(a => a !== 'granted')
+      ? 'Motion &amp; compass were not allowed, so tap the bullseye to lock. To fix: close this tab, reopen the page and tap Allow.'
+      : 'No motion sensor data, so tap the bullseye to lock.');
+  }, 3000);
+  if (!storageOK) showBanner('This phone is blocking storage, so results will not be saved. Turn off Private Browsing.');
+  startCamera().catch(() => { toast('Camera unavailable: the test still works'); });
+  requestWakeLock();
+  requestAnimationFrame(tick);
+});
+$('holePrev').onclick = () => setHole(S().hole - 1);
+$('holeNext').onclick = () => setHole(S().hole + 1);
+$('logBtn').onclick = openLogModal;
+$('pinBtn').onclick = openPinModal;
+$('reticle').onclick = () => { if (lockState === 'locked') unlock(); else doLock(); };
+$('banner').onclick = hideBanner;
+$('resultsBtn').onclick = () => { renderResults(); renderSettings(); show('results'); };
+$('backBtn').onclick = () => { show('aim'); refreshUI(); };
+$('lensBtn').onclick = async () => {
+  if (cam.devices.length < 2) return;
+  cam.index = (cam.index + 1) % cam.devices.length;
+  try { await startCamera(cam.devices[cam.index].deviceId); } catch (e) { toast('Could not switch lens'); }
+};
+$('zoomBtn').onclick = async () => {
+  if (!cam.zoomCaps || !cam.stream) return;
+  cam.zoomIdx = (cam.zoomIdx + 1) % cam.zoomLevels.length;
+  const z = cam.zoomLevels[cam.zoomIdx];
+  try { await cam.stream.getVideoTracks()[0].applyConstraints({ advanced: [{ zoom: z }] }); $('zoomBtn').textContent = z + '×'; } catch (e) { toast('Zoom not supported'); }
+};
+$('shareCsv').onclick = () => { shareCSV().catch(() => toast('Export failed: try Copy CSV')); };
+$('copyCsv').onclick = () => {
+  const csv = buildCSV();
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(csv).then(() => toast('CSV copied'), () => toast('Copy failed'));
+  else toast('Copy not supported');
+};
+$('logTable').addEventListener('click', e => {
+  const id = e.target && e.target.getAttribute('data-log'); if (!id) return;
+  if (!confirm('Delete this shot?')) return;
+  data.logs = data.logs.filter(l => l.id !== id); save(); renderResults();
+});
+$('pinTable').addEventListener('click', e => {
+  const id = e.target && e.target.getAttribute('data-pin'); if (!id) return;
+  if (!confirm('Delete this pin? Shots that used it will wait for a new pin.')) return;
+  data.pins = data.pins.filter(p => p.id !== id);
+  for (const l of data.logs) if (l.pinId === id) l.pinId = null;
+  save(); renderResults();
+});
+$('settingsForm').addEventListener('change', e => {
+  const el = e.target, key = el.getAttribute('data-key'); if (!key) return;
+  if (el.type === 'checkbox') S()[key] = el.checked;
+  else {
+    const v = parseFloat(el.value), min = parseFloat(el.min), max = parseFloat(el.max);
+    if (!Number.isFinite(v)) { el.value = S()[key]; return; }
+    S()[key] = Math.min(max, Math.max(min, key === 'holeCount' ? Math.round(v) : v));
+    el.value = S()[key];
+    if (key === 'holeCount' && S().hole > S().holeCount) S().hole = S().holeCount;
+  }
+  save();
+});
+$('clearAll').onclick = () => {
+  if (!confirm('Delete ALL shots and pins on this phone? Export first if you need them.')) return;
+  if (!confirm('Are you sure? This cannot be undone.')) return;
+  data.pins = []; data.logs = []; save(); renderResults(); toast('All data cleared');
+};
+
+/* ---------------- Boot ---------------- */
+load();
+$('verStart').textContent = APP_VERSION; $('verRes').textContent = APP_VERSION;
+let lastPoll = 0;
+setInterval(() => {
+  if ($('aim').classList.contains('hidden')) return;
+  refreshUI();
+  // Standing still, a phone may send fewer GPS updates; ask for a fresh one if the last is getting old.
+  if (started && 'geolocation' in navigator && (!gps.latest || Date.now() - gps.latest.t > 2500) && Date.now() - lastPoll > 2500) {
+    lastPoll = Date.now();
+    try { navigator.geolocation.getCurrentPosition(onPos, () => {}, GEO_OPTS); } catch (e) {}
+  }
+}, 300);
+
+// Exposed for automated tests.
+window.PCF = { localDelta, distanceM, bearingDeg, toYd, averageFixes, computeStats, comparisons, addPin, currentPin, buildCSV, dayKey,
+  data: () => data, version: APP_VERSION };
+})();
+</script>
+</body>
+</html>
